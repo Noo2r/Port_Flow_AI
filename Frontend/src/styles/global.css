@@ -1,0 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+::-webkit-scrollbar { display: none; }
+* { scrollbar-width: none; }
+body { font-family: 'Inter', sans-serif; }
