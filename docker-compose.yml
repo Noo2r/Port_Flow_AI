@@ -1,0 +1,84 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# FULL DEMO STACK — db + redis + api + frontend, DB auto-restored from
+# data/portflow_backup.sql (12,000 vessels + seeded admin user).
+#
+# This is the one Start.bat / setup.bat / setup.sh all use, and the one to
+# run for demos. For backend-only development against an empty DB, see
+# Backend/docker-compose.yml instead.
+#
+# See README.md "Architecture Notes" for the full reconciliation of why
+# both files exist.
+# ─────────────────────────────────────────────────────────────────────────────
+services:
+
+  # ── PostgreSQL ─────────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: portflow_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: portflow
+      POSTGRES_PASSWORD: portflow
+      POSTGRES_DB: portflow
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./data/portflow_backup.sql:/docker-entrypoint-initdb.d/01_restore.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U portflow -d portflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  # ── Redis ──────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: portflow_redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── FastAPI Backend ────────────────────────────────────────────────────────
+  api:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    container_name: portflow_api
+    restart: unless-stopped
+    env_file:
+      - ./Backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://portflow:portflow@db:5432/portflow
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./Backend:/app
+      - ./data/port_flow_dataset.csv:/tmp/port_flow_dataset.csv
+
+  # ── React Frontend (nginx) ─────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile
+    container_name: portflow_frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:

@@ -1,0 +1,73 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ISOLATED TEST STACK — completely separate db + redis + api from the demo
+# stack (docker-compose.yml). Different container names, different host
+# ports, different database name, ephemeral storage (tmpfs — wiped on every
+# `down`, no persistent volume to ever confuse with the demo data).
+#
+# Exists so pytest's integration tests (the `client`/`auth_client` fixtures
+# in Backend/tests/conftest.py) physically cannot reach the demo database —
+# they hit this stack's API on port 8001, which talks to this stack's
+# Postgres on port 5433, never the demo API on 8000 / demo DB on 5432.
+#
+# Usage — see README.md "Testing" section for full details:
+#   docker compose -f docker-compose.test.yml up -d --build
+#   docker compose -f docker-compose.test.yml exec test_api pytest tests/ -v
+#   docker compose -f docker-compose.test.yml down -v
+# ─────────────────────────────────────────────────────────────────────────────
+services:
+
+  test_db:
+    image: postgres:16-alpine
+    container_name: portflow_test_db
+    environment:
+      POSTGRES_USER: portflow_test
+      POSTGRES_PASSWORD: portflow_test
+      POSTGRES_DB: portflow_test
+    tmpfs:
+      - /var/lib/postgresql/data   # ephemeral — fresh schema every `up`, nothing survives `down`
+    ports:
+      - "5433:5432"                # distinct host port — cannot collide with the demo DB's 5432
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U portflow_test -d portflow_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  test_redis:
+    image: redis:7-alpine
+    container_name: portflow_test_redis
+    ports:
+      - "6380:6379"                # distinct host port — cannot collide with the demo Redis's 6379
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  test_api:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    container_name: portflow_test_api
+    environment:
+      DATABASE_URL: postgresql+asyncpg://portflow_test:portflow_test@test_db:5432/portflow_test
+      REDIS_URL: redis://test_redis:6379/0
+      SECRET_KEY: test-secret-key-for-pytest-only-not-for-production-use
+      ANTHROPIC_API_KEY: ""        # force the chatbot's deterministic rule-based fallback in tests
+      DEBUG: "true"
+      # "*" is rejected at startup (app/config.py) since the app always sends
+      # credentialed requests — tests don't exercise CORS at all, so any
+      # explicit origin works here; reuse the same safe dev default.
+      CORS_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173"
+    ports:
+      - "8001:8000"                # distinct host port — cannot collide with the demo API's 8000
+    depends_on:
+      test_db:
+        condition: service_healthy
+      test_redis:
+        condition: service_healthy
+    volumes:
+      - ./Backend:/app
+      # Deliberately NOT mounting data/portflow_backup.sql or port_flow_dataset.csv's
+      # demo seed data — the test DB starts empty; alembic creates schema only,
+      # and app startup seeds exactly one default admin user (app/db/seed.py).

@@ -1,0 +1,32 @@
+# ── Secrets — never commit real credentials ───────────────────────────────
+.env
+**/.env
+!.env.example
+!**/.env.example
+
+# ── Python ──────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# ── Node / Frontend ─────────────────────────────────────────────────────────
+node_modules/
+dist/
+.vite/
+
+# ── Editor / OS ─────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ── Docker / runtime ────────────────────────────────────────────────────────
+*.log
+.port/
+
+# ── Misc generated/backup artifacts ─────────────────────────────────────────
+*.zip
+openapi_tmp.json

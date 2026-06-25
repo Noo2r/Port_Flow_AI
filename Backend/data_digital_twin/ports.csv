@@ -1,0 +1,9 @@
+port_code,port_name,country,city,latitude,longitude,num_berths,max_loa_m,max_draft_m,capacity_teu,operational_region
+PORT_A,Port Alpha,Egypt,Alexandria,31.2,29.92,12,380.0,22.0,2185798,Mediterranean
+PORT_B,Port Bravo,Egypt,Port Said,31.26,32.3,12,380.0,22.0,4317642,Mediterranean
+PORT_C,Port Capri,Italy,Genoa,44.41,8.93,12,380.0,22.0,3508377,Mediterranean
+PORT_D,Port Delta,Greece,Piraeus,37.94,23.64,12,380.0,22.0,3015036,Mediterranean
+PORT_E,Port Echo,Egypt,Suez,29.97,32.55,12,380.0,22.0,1377268,Red Sea
+PORT_F,Port Foxtrot,Saudi Arabia,Jeddah,21.49,39.18,12,380.0,22.0,1377179,Red Sea
+PORT_G,Port Gulf,UAE,Jebel Ali,25.01,55.06,12,380.0,22.0,1014909,Gulf
+PORT_H,Port Harbor,Singapore,Singapore,1.29,103.85,12,380.0,22.0,4004851,Southeast Asia

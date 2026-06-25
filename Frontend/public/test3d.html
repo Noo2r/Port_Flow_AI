@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><style>*{margin:0;padding:0}body{background:#000}canvas{display:block}</style></head>
+<body>
+<div id="info" style="position:fixed;top:10px;left:10px;color:white;font-family:monospace;font-size:14px;z-index:99"></div>
+<script src="./three.min.js"></script>
+<script src="./OrbitControls.js"></script>
+<script>
+const info = document.getElementById('info');
+try {
+  info.textContent = 'THREE version: ' + THREE.REVISION;
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+  camera.position.z = 5;
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x111122);
+  document.body.appendChild(renderer.domElement);
+
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+  // Cube
+  const cube = new THREE.Mesh(
+    new THREE.BoxGeometry(1,1,1),
+    new THREE.MeshLambertMaterial({ color: 0x38bdf8 })
+  );
+  scene.add(cube);
+
+  // Light
+  scene.add(new THREE.DirectionalLight(0xffffff, 1).position.set(5,5,5));
+  scene.add(new THREE.AmbientLight(0x404040, 0.5));
+
+  // Water plane
+  const water = new THREE.Mesh(
+    new THREE.PlaneGeometry(10,10,20,20),
+    new THREE.MeshLambertMaterial({ color: 0x0a4a7a, transparent:true, opacity:0.8 })
+  );
+  water.rotation.x = -Math.PI/2;
+  water.position.y = -1;
+  scene.add(water);
+
+  let t = 0;
+  function animate() {
+    requestAnimationFrame(animate);
+    t += 0.01;
+    cube.rotation.x = t;
+    cube.rotation.y = t;
+    controls.update();
+    renderer.render(scene, camera);
+    info.textContent = 'THREE r' + THREE.REVISION + ' | Frame: ' + Math.floor(t*100);
+  }
+  animate();
+
+} catch(e) {
+  info.textContent = 'ERROR: ' + e.message;
+  info.style.color = '#f87171';
+}
+</script>
+</body></html>

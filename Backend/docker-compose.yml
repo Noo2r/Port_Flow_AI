@@ -1,0 +1,70 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# BACKEND-ONLY DEV STACK — db + redis + api, NO frontend, NO seed/restore.
+#
+# This is for backend-only development (e.g. testing API/DB changes without
+# rebuilding the frontend). It starts with an EMPTY database — no admin user,
+# no vessels, no visits — until you seed it yourself.
+#
+# For the full demo-ready stack (frontend + seeded DB with 12,000 vessels +
+# admin login), use the ROOT docker-compose.yml instead:
+#   docker compose -f ../docker-compose.yml up -d
+#
+# See ../README.md "Architecture Notes" for the full reconciliation of why
+# both files exist.
+# ─────────────────────────────────────────────────────────────────────────────
+services:
+
+  db:
+    image: postgres:16-alpine
+    container_name: portflow_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: portflow
+      POSTGRES_PASSWORD: portflow
+      POSTGRES_DB: portflow
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U portflow -d portflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: portflow_redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build: .
+    container_name: portflow_api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://portflow:portflow@db:5432/portflow
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - backup_data:/tmp/portflow_backups
+
+volumes:
+  postgres_data:
+  backup_data:

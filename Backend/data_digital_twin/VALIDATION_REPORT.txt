@@ -1,0 +1,39 @@
+==============================================================================
+  PORTFLOW AI — DIGITAL TWIN GENERATOR — VALIDATION REPORT
+==============================================================================
+
+Dataset row counts:
+  vessels.csv                 600 rows
+  ports.csv                     8 rows
+  berths.csv                   96 rows
+  vessel_visits.csv        12,097 rows
+  live_port_state.csv           8 rows
+
+Checks:
+  [PASS] No duplicate vessel names
+  [PASS] No duplicate IMO numbers
+  [PASS] No duplicate MMSI
+  [PASS] All IMO numbers pass check-digit validation
+  [PASS] All MMSI are valid 9-digit values
+  [PASS] No anonymous placeholder vessel names (e.g. V00001-style)
+  [PASS] No orphan visits (every visit.vessel_id exists in vessels.csv)
+  [PASS] No orphan visit->berth references
+  [PASS] Every visit.port_id is a real port
+  [PASS] No orphan occupied berths (every Occupied berth's vessel exists and is in a berth-occupying stage)
+  [PASS] Occupied berths (53) exactly equals berth-occupying vessels (53)
+  [PASS] Berth status counts sum to total berth count (no berth double-counted/missing)
+  [PASS] Occupied berth count falls in a realistic operational range (30-75 of 96)
+  [PASS] Available berth count falls in a realistic operational range (15-40 of 96)
+  [PASS] At-Sea vessels form the large majority (70-90%), not ~100%  (actual=83.8%)
+  [PASS] At least one vessel in every lifecycle stage
+  [PASS] All completed visits have both scheduled_eta and actual_arrival_time
+  [PASS] No completed visit's actual_arrival_time is in the future
+  [PASS] In-progress 'Approaching' visits correctly have no actual_arrival_time yet (not fabricated)
+  [PASS] Congestion index is within [0,1] for every port
+  [PASS] Congestion varies meaningfully across ports (stddev > 0.05, not all ~identical)  (stddev=0.124)
+  [PASS] Not every port has the same congestion label
+  [PASS] Queue length is non-negative for every port
+  [PASS] vessel_visits.csv retains every raw feature column the trained ETA/congestion models require
+
+Result: 24/24 checks passed.
+==============================================================================
