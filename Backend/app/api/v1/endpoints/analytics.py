@@ -36,14 +36,14 @@ MAX_WAIT_HOURS = 24
 
 
 @router.get("/metrics", response_model=DashboardMetrics)
-async def dashboard_metrics(_user: _TechnicalUser, db: AsyncSession = Depends(get_db)):
+async def dashboard_metrics(_user: CurrentUser, db: AsyncSession = Depends(get_db)):
     """Return real-time KPI metrics for the operations dashboard."""
     return await get_dashboard_metrics(db)
 
 
 @router.get("/charts")
 async def get_chart_data(
-    _user: _TechnicalUser,
+    _user: CurrentUser,
     days: int = Query(default=14, ge=7, le=90, description="Number of days to include"),
     db: AsyncSession = Depends(get_db),
 ):
