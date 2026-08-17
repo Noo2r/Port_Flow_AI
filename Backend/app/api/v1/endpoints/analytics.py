@@ -5,7 +5,15 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select, cast, Date
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import CurrentUser
+from typing import Annotated
+
+from app.core.dependencies import CurrentUser, require_roles
+from app.models.iam import User, UserRole
+
+# Convenience alias: roles allowed to access the Analytics / Intelligence pages
+_TechnicalUser = Annotated[User, Depends(require_roles(
+    UserRole.ADMIN, UserRole.PORT_MANAGER, UserRole.ANALYST
+))]
 from app.database import get_db
 from app.models.berth import Berth, BerthStatus
 from app.models.port import Port
@@ -28,14 +36,14 @@ MAX_WAIT_HOURS = 24
 
 
 @router.get("/metrics", response_model=DashboardMetrics)
-async def dashboard_metrics(_user: CurrentUser, db: AsyncSession = Depends(get_db)):
+async def dashboard_metrics(_user: _TechnicalUser, db: AsyncSession = Depends(get_db)):
     """Return real-time KPI metrics for the operations dashboard."""
     return await get_dashboard_metrics(db)
 
 
 @router.get("/charts")
 async def get_chart_data(
-    _user: CurrentUser,
+    _user: _TechnicalUser,
     days: int = Query(default=14, ge=7, le=90, description="Number of days to include"),
     db: AsyncSession = Depends(get_db),
 ):
@@ -324,7 +332,7 @@ async def get_chart_data(
     ),
 )
 async def compare_metrics(
-    _user: CurrentUser,
+    _user: _TechnicalUser,
     db: AsyncSession = Depends(get_db),
     year: int = Query(default=None, ge=2000, le=2100, description="Year (default: current)"),
     month: int = Query(default=None, ge=1, le=12, description="Month 1–12 (default: current)"),

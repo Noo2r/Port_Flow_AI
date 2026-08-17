@@ -100,21 +100,21 @@ async def client():
 
 @pytest_asyncio.fixture
 async def auth_client():
-    """Async HTTP client pre-authenticated as port_manager (for protected endpoints)."""
+    """
+    Async HTTP client pre-authenticated as a PORT_MANAGER user.
+
+    The public registration endpoint always creates READONLY accounts (by
+    design — roles can only be assigned by an ADMIN). We therefore log in as
+    `manager@portflow.ai` which is seeded by `seed_defaults()` with role
+    PORT_MANAGER and is always present in the isolated test stack.
+    """
     async with httpx.AsyncClient(base_url=BASE_URL, timeout=15.0) as c:
-        # Ensure the shared test user exists
-        await c.post("/api/v1/auth/register", json={
-            "email": "pytest_shared@portflow.io",
-            "password": "Test1234!",
-            "full_name": "Pytest User",
-            "role": "port_manager",
-        })
         r = await c.post(
             "/api/v1/auth/token",
-            data={"username": "pytest_shared@portflow.io", "password": "Test1234!"},
+            data={"username": "manager@portflow.ai", "password": "Admin1234!"},
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
-        token = r.json()["access_token"]
+        token = r.json().get("access_token", "")
         c.headers.update({"Authorization": f"Bearer {token}"})
         yield c
 

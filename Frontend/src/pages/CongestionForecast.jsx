@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import Sidebar from '../components/Sidebar'
+import { useAuth } from '../context/AuthContext'
 import {
   useCongestionPortOverview, useCongestionEvaluation, useCongestionModelInfo,
   useCongestionPredict,
 } from '../hooks/queries'
+
+const TECHNICAL_ROLES = new Set(['admin', 'port_manager', 'analyst'])
 
 // ── Colour system (matches ModelEvaluation and the rest of the dark-theme pages)
 const CARD_BG  = '#080f1e'
@@ -201,9 +204,17 @@ function buildPredictPayload(f) {
 }
 
 export default function CongestionForecast() {
+  const { user } = useAuth()
+  const isTechnical = TECHNICAL_ROLES.has(user?.role)
   const [form, setForm]   = useState(DEFAULTS)
   const [error, setError] = useState(null)
   const [tab, setTab]     = useState('ports')
+
+  // If a non-technical user somehow lands on the evaluation tab (stale state),
+  // reset to the default forecast tab.
+  useEffect(() => {
+    if (!isTechnical && tab === 'evaluation') setTab('forecast')
+  }, [isTechnical, tab])
 
   const { data: overview, isLoading: ovLoading } = useCongestionPortOverview()
   const { data: evalData }                       = useCongestionEvaluation()
@@ -267,7 +278,8 @@ export default function CongestionForecast() {
           {[
             { id: 'forecast',   icon: 'fa-magnifying-glass-chart', label: 'Live Forecast' },
             { id: 'ports',      icon: 'fa-map-location-dot',       label: 'Port Overview' },
-            { id: 'evaluation', icon: 'fa-flask',                   label: 'Model Evaluation' },
+            // Model Evaluation is restricted to TECHNICAL bucket (admin, port_manager, analyst)
+            ...(isTechnical ? [{ id: 'evaluation', icon: 'fa-flask', label: 'Model Evaluation' }] : []),
           ].map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
               style={{

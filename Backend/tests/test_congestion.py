@@ -71,8 +71,16 @@ def test_model_info_shape(unit_client):
 
 # ── /evaluation ───────────────────────────────────────────────────────────────
 
-def test_evaluation_describes_three_stage_pipeline(unit_client):
+def test_evaluation_requires_auth(unit_client):
+    """GET /congestion/evaluation is now restricted to the TECHNICAL bucket —
+    an unauthenticated request must be rejected with 401."""
     r = unit_client.get("/api/v1/congestion/evaluation")
+    assert r.status_code == 401
+
+
+def test_evaluation_describes_three_stage_pipeline(auth_unit_client):
+    """ADMIN user (injected by auth_unit_client) must reach the evaluation endpoint."""
+    r = auth_unit_client.get("/api/v1/congestion/evaluation")
     assert r.status_code == 200
     data = r.json()
     assert "models" in data
@@ -81,8 +89,8 @@ def test_evaluation_describes_three_stage_pipeline(unit_client):
     assert "Stage 1" in data["pipeline"] and "Stage 3" in data["pipeline"]
 
 
-def test_evaluation_grades_are_consistent_with_r2(unit_client):
-    r = unit_client.get("/api/v1/congestion/evaluation")
+def test_evaluation_grades_are_consistent_with_r2(auth_unit_client):
+    r = auth_unit_client.get("/api/v1/congestion/evaluation")
     data = r.json()["models"]
     if data["congestion"]["R2"] >= 0.90:
         assert data["congestion"]["grade"] == "Excellent"

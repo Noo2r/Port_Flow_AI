@@ -39,6 +39,11 @@ const navGroups = [
   },
 ]
 
+/** Returns true for roles that belong to the TECHNICAL bucket. */
+function isTechnicalRole(role) {
+  return role === 'admin' || role === 'port_manager' || role === 'analyst'
+}
+
 export default function Sidebar() {
   const navigate = useNavigate()
   const { user, logout } = useAuth()
@@ -78,10 +83,25 @@ export default function Sidebar() {
       {/* ── Nav ── */}
       <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-5">
         {navGroups.map(group => {
-          // Filter items that require admin role
-          const visibleItems = group.items.filter(item =>
-            item.to !== '/admin' || user?.role === 'admin'
-          )
+          // Filter items by role bucket:
+          //   /admin            → admin only (unchanged)
+          //   /analytics        → technical bucket only (admin, port_manager, analyst)
+          //   /evaluation child → technical bucket only (hidden via parent's children filter below)
+          const technical = isTechnicalRole(user?.role)
+          const visibleItems = group.items
+            .filter(item =>
+              item.to !== '/admin' || user?.role === 'admin'
+            )
+            .filter(item =>
+              item.to !== '/analytics' || technical
+            )
+            .map(item => {
+              // Strip the Model Evaluation child from /predictions for non-technical roles
+              if (item.children && !technical) {
+                return { ...item, children: item.children.filter(c => c.to !== '/evaluation') }
+              }
+              return item
+            })
           if (visibleItems.length === 0) return null
           return (
           <div key={group.label}>

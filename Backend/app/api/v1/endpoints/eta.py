@@ -1,9 +1,11 @@
 from datetime import datetime
+from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import CurrentUser
+from app.core.dependencies import CurrentUser, require_roles
+from app.models.iam import User, UserRole
 from app.core.lifecycle import is_valid_vessel_transition, is_valid_visit_transition
 from app.database import get_db
 from app.ml.eta_predictor import eta_predictor
@@ -319,7 +321,10 @@ async def get_model_info():
 
 
 @router.post("/set-active-model")
-async def set_active_model(payload: dict):
+async def set_active_model(
+    payload: dict,
+    _user: Annotated[User, Depends(require_roles(UserRole.ADMIN, UserRole.PORT_MANAGER))],
+):
     """Switch the active prediction model at runtime without retraining."""
     if eta_predictor is None:
         raise HTTPException(status_code=503, detail="ETA model not loaded.")
@@ -383,7 +388,7 @@ async def record_prediction_feedback(
 
 @router.get("/evaluation")
 async def get_model_evaluation(
-    _user: CurrentUser,
+    _user: Annotated[User, Depends(require_roles(UserRole.ADMIN, UserRole.PORT_MANAGER, UserRole.ANALYST))],
     db: AsyncSession = Depends(get_db),
 ):
     """

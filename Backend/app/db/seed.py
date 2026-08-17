@@ -21,6 +21,22 @@ async def seed_defaults(db: AsyncSession) -> None:
         is_active=True,
         is_verified=True,
     )
-    db.add(admin)
+    manager = User(
+        email="manager@portflow.ai",
+        full_name="Port Manager",
+        hashed_password=hash_password("Admin1234!"),
+        role=UserRole.PORT_MANAGER,
+        is_active=True,
+        is_verified=True,
+    )
+    operator = User(
+        email="operator@portflow.ai",
+        full_name="Port Operator",
+        hashed_password=hash_password("Admin1234!"),
+        role=UserRole.OPERATIONS,
+        is_active=True,
+        is_verified=True,
+    )
+    db.add_all([admin, manager, operator])
     await db.commit()
-    logger.info("SEED | default admin created  →  admin@portflow.ai / Admin1234!")
+    logger.info("SEED | default users created  →  admin@portflow.ai / manager@portflow.ai / operator@portflow.ai (Admin1234!)")

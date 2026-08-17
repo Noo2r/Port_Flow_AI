@@ -10,14 +10,16 @@ GET  /api/v1/congestion/evaluation      → model evaluation summary
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Annotated, Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.dependencies import require_roles
 from app.database import get_db
 from app.ml.congestion_predictor import congestion_predictor
+from app.models.iam import User, UserRole
 from app.services.congestion_service import get_port_congestion_forecasts
 
 router = APIRouter()
@@ -141,7 +143,9 @@ async def get_port_overview(db: AsyncSession = Depends(get_db)):
 # ── 4. Evaluation summary ──────────────────────────────────────────────────────
 
 @router.get("/evaluation", tags=["Congestion Forecast"])
-async def get_evaluation():
+async def get_evaluation(
+    _user: Annotated[User, Depends(require_roles(UserRole.ADMIN, UserRole.PORT_MANAGER, UserRole.ANALYST))],
+):
     """
     Return held-out evaluation metrics and interpretation for the Stage 3 model.
     """

@@ -42,6 +42,20 @@ function ProtectedRoute({ children }) {
   return children
 }
 
+const TECHNICAL_ROLES = new Set(['admin', 'port_manager', 'analyst'])
+
+function TechnicalRoute({ children }) {
+  const { user } = useAuth()
+  const token = localStorage.getItem('access_token')
+  const cachedUser = (() => {
+    try { return JSON.parse(localStorage.getItem('user')) } catch { return null }
+  })()
+  const effectiveUser = user || cachedUser
+  if (!token && !effectiveUser) return <Navigate to="/login" replace />
+  if (effectiveUser && !TECHNICAL_ROLES.has(effectiveUser.role)) return <Navigate to="/dashboard" replace />
+  return children
+}
+
 function AdminRoute({ children }) {
   const { user } = useAuth()
   const token = localStorage.getItem('access_token')
@@ -69,9 +83,9 @@ export default function AppRouter() {
           <Route path="/berth"         element={<ProtectedRoute><BerthAllocation /></ProtectedRoute>} />
           <Route path="/cargo"         element={<ProtectedRoute><CargoWorkforce /></ProtectedRoute>} />
           <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
-          <Route path="/analytics"     element={<ProtectedRoute><AIAnalytics /></ProtectedRoute>} />
+          <Route path="/analytics"     element={<TechnicalRoute><AIAnalytics /></TechnicalRoute>} />
           <Route path="/predictions"   element={<ProtectedRoute><Predictions /></ProtectedRoute>} />
-          <Route path="/evaluation"    element={<ProtectedRoute><ModelEvaluation /></ProtectedRoute>} />
+          <Route path="/evaluation"    element={<TechnicalRoute><ModelEvaluation /></TechnicalRoute>} />
           <Route path="/port-ops"      element={<ProtectedRoute><PortOperations /></ProtectedRoute>} />
           <Route path="/congestion"    element={<ProtectedRoute><CongestionForecast /></ProtectedRoute>} />
           <Route path="/maritime-map"  element={<ProtectedRoute><MaritimeMap /></ProtectedRoute>} />
