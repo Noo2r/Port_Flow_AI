@@ -44,13 +44,13 @@ def test_get_berth_not_found(mock_db, unit_client):
     assert r.json()["error"] == "Berth not found"
 
 
-def test_create_berth_missing_fields(unit_client):
-    r = unit_client.post("/api/v1/berths/", json={})
+def test_create_berth_missing_fields(auth_unit_client):
+    r = auth_unit_client.post("/api/v1/berths/", json={})
     assert r.status_code == 422
 
 
-def test_create_berth_invalid_type(unit_client):
-    r = unit_client.post("/api/v1/berths/", json={
+def test_create_berth_invalid_type(auth_unit_client):
+    r = auth_unit_client.post("/api/v1/berths/", json={
         "code": "X1",
         "name": "Bad Berth",
         "berth_type": "submarine_dock",
@@ -60,20 +60,38 @@ def test_create_berth_invalid_type(unit_client):
     assert r.status_code == 422
 
 
-def test_patch_berth_not_found(mock_db, unit_client):
+def test_patch_berth_not_found(mock_db, auth_unit_client):
     mock_db.get = AsyncMock(return_value=None)
-    r = unit_client.patch("/api/v1/berths/999", json={"status": "occupied"})
+    r = auth_unit_client.patch("/api/v1/berths/999", json={"status": "occupied"})
     assert r.status_code == 404
+
+
+def test_create_berth_requires_auth(unit_client):
+    r = unit_client.post("/api/v1/berths/", json={
+        "code": "B-UNAUTH", "name": "Unauth Berth", "berth_type": "container",
+        "max_length": 200.0, "max_draft": 10.0,
+    })
+    assert r.status_code == 401
+
+
+def test_update_berth_requires_auth(unit_client):
+    r = unit_client.patch("/api/v1/berths/1", json={"status": "occupied"})
+    assert r.status_code == 401
+
+
+def test_delete_berth_requires_auth(unit_client):
+    r = unit_client.delete("/api/v1/berths/1")
+    assert r.status_code == 401
 
 
 # --- Integration tests ---
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_berth_crud_lifecycle(client):
+async def test_berth_crud_lifecycle(auth_client):
     code = f"B-{uid()}"
     # Create
-    r = await client.post("/api/v1/berths/", json={
+    r = await auth_client.post("/api/v1/berths/", json={
         "code": code,
         "name": "Integration Berth",
         "berth_type": "container",
@@ -88,19 +106,19 @@ async def test_berth_crud_lifecycle(client):
     assert berth["has_crane"] is True
 
     # Read
-    r = await client.get(f"/api/v1/berths/{bid}")
+    r = await auth_client.get(f"/api/v1/berths/{bid}")
     assert r.status_code == 200
     assert r.json()["code"] == code
 
     # Update status to occupied
-    r = await client.patch(f"/api/v1/berths/{bid}", json={"status": "occupied"})
+    r = await auth_client.patch(f"/api/v1/berths/{bid}", json={"status": "occupied"})
     assert r.status_code == 200
     assert r.json()["status"] == "occupied"
 
     # Confirm persisted
-    r = await client.get(f"/api/v1/berths/{bid}")
+    r = await auth_client.get(f"/api/v1/berths/{bid}")
     assert r.json()["status"] == "occupied"
 
     # 404 on non-existent
-    r = await client.get("/api/v1/berths/999999")
+    r = await auth_client.get("/api/v1/berths/999999")
     assert r.status_code == 404

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.dependencies import CurrentUser
 from app.core.lifecycle import InvalidTransitionError, validate_vessel_transition
 from app.database import get_db
 from app.models.vessel import Vessel
@@ -21,7 +22,7 @@ async def list_vessels(
 
 
 @router.post("/", response_model=VesselResponse, status_code=status.HTTP_201_CREATED)
-async def create_vessel(payload: VesselCreate, db: AsyncSession = Depends(get_db)):
+async def create_vessel(payload: VesselCreate, _user: CurrentUser, db: AsyncSession = Depends(get_db)):
     vessel = Vessel(**payload.model_dump())
     db.add(vessel)
     await db.commit()
@@ -38,7 +39,7 @@ async def get_vessel(vessel_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.patch("/{vessel_id}", response_model=VesselResponse)
-async def update_vessel(vessel_id: int, payload: VesselUpdate, db: AsyncSession = Depends(get_db)):
+async def update_vessel(vessel_id: int, payload: VesselUpdate, _user: CurrentUser, db: AsyncSession = Depends(get_db)):
     vessel = await db.get(Vessel, vessel_id)
     if not vessel:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vessel not found")
@@ -58,7 +59,7 @@ async def update_vessel(vessel_id: int, payload: VesselUpdate, db: AsyncSession 
 
 
 @router.delete("/{vessel_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_vessel(vessel_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_vessel(vessel_id: int, _user: CurrentUser, db: AsyncSession = Depends(get_db)):
     vessel = await db.get(Vessel, vessel_id)
     if not vessel:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vessel not found")

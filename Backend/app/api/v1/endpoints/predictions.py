@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.dependencies import CurrentUser
 from app.database import get_db
 from app.models.prediction import Prediction
 from app.schemas.prediction import PredictionCreate, PredictionUpdate, PredictionResponse
@@ -27,7 +28,7 @@ async def list_predictions(
 
 
 @router.post("/", response_model=PredictionResponse, status_code=status.HTTP_201_CREATED)
-async def create_prediction(payload: PredictionCreate, db: AsyncSession = Depends(get_db)):
+async def create_prediction(payload: PredictionCreate, _user: CurrentUser, db: AsyncSession = Depends(get_db)):
     prediction = Prediction(**payload.model_dump())
     db.add(prediction)
     await db.commit()
@@ -45,7 +46,7 @@ async def get_prediction(prediction_id: int, db: AsyncSession = Depends(get_db))
 
 @router.patch("/{prediction_id}", response_model=PredictionResponse)
 async def update_prediction(
-    prediction_id: int, payload: PredictionUpdate, db: AsyncSession = Depends(get_db)
+    prediction_id: int, payload: PredictionUpdate, _user: CurrentUser, db: AsyncSession = Depends(get_db)
 ):
     prediction = await db.get(Prediction, prediction_id)
     if not prediction:

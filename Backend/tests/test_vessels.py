@@ -68,13 +68,13 @@ def test_get_vessel_not_found(mock_db, unit_client):
     assert r.json()["error"] == "Vessel not found"
 
 
-def test_create_vessel_missing_required_fields(unit_client):
-    r = unit_client.post("/api/v1/vessels/", json={})
+def test_create_vessel_missing_required_fields(auth_unit_client):
+    r = auth_unit_client.post("/api/v1/vessels/", json={})
     assert r.status_code == 422  # Unprocessable Entity
 
 
-def test_create_vessel_invalid_type(unit_client):
-    r = unit_client.post("/api/v1/vessels/", json={
+def test_create_vessel_invalid_type(auth_unit_client):
+    r = auth_unit_client.post("/api/v1/vessels/", json={
         "imo_number": "IMO9999999",
         "name": "Bad Ship",
         "vessel_type": "spaceship",  # not a valid enum value
@@ -82,20 +82,37 @@ def test_create_vessel_invalid_type(unit_client):
     assert r.status_code == 422
 
 
-def test_patch_vessel_not_found(mock_db, unit_client):
+def test_patch_vessel_not_found(mock_db, auth_unit_client):
     mock_db.get = AsyncMock(return_value=None)
-    r = unit_client.patch("/api/v1/vessels/999", json={"flag": "SA"})
+    r = auth_unit_client.patch("/api/v1/vessels/999", json={"flag": "SA"})
     assert r.status_code == 404
+
+
+def test_create_vessel_requires_auth(unit_client):
+    r = unit_client.post("/api/v1/vessels/", json={
+        "imo_number": "IMO9111111", "name": "Unauth Ship", "vessel_type": "container",
+    })
+    assert r.status_code == 401
+
+
+def test_update_vessel_requires_auth(unit_client):
+    r = unit_client.patch("/api/v1/vessels/1", json={"flag": "SA"})
+    assert r.status_code == 401
+
+
+def test_delete_vessel_requires_auth(unit_client):
+    r = unit_client.delete("/api/v1/vessels/1")
+    assert r.status_code == 401
 
 
 # --- Integration tests ---
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_vessel_crud_lifecycle(client):
+async def test_vessel_crud_lifecycle(auth_client):
     imo = f"IMO9{uid()}"
     # Create
-    r = await client.post("/api/v1/vessels/", json={
+    r = await auth_client.post("/api/v1/vessels/", json={
         "imo_number": imo,
         "name": "Integration Vessel",
         "vessel_type": "container",
@@ -109,27 +126,27 @@ async def test_vessel_crud_lifecycle(client):
     assert vessel["flag"] == "EG"
 
     # Read
-    r = await client.get(f"/api/v1/vessels/{vid}")
+    r = await auth_client.get(f"/api/v1/vessels/{vid}")
     assert r.status_code == 200
     assert r.json()["imo_number"] == imo
 
     # Update
-    r = await client.patch(f"/api/v1/vessels/{vid}", json={"flag": "SA", "status": "berthed"})
+    r = await auth_client.patch(f"/api/v1/vessels/{vid}", json={"flag": "SA", "status": "berthed"})
     assert r.status_code == 200
     updated = r.json()
     assert updated["flag"] == "SA"
     assert updated["status"] == "berthed"
 
     # Confirm update persisted
-    r = await client.get(f"/api/v1/vessels/{vid}")
+    r = await auth_client.get(f"/api/v1/vessels/{vid}")
     assert r.json()["flag"] == "SA"
 
     # List includes it
-    r = await client.get("/api/v1/vessels/?limit=1000")
+    r = await auth_client.get("/api/v1/vessels/?limit=1000")
     assert r.status_code == 200
     ids = [v["id"] for v in r.json()]
     assert vid in ids
 
     # 404 on non-existent
-    r = await client.get("/api/v1/vessels/999999")
+    r = await auth_client.get("/api/v1/vessels/999999")
     assert r.status_code == 404

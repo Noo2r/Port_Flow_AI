@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.dependencies import CurrentUser
 from app.core.lifecycle import InvalidTransitionError, validate_visit_transition
 from app.database import get_db
 from app.models.berth import Berth, BerthStatus
@@ -58,7 +59,7 @@ async def list_visits(
 
 
 @router.post("/", response_model=VisitResponse, status_code=status.HTTP_201_CREATED)
-async def create_visit(payload: VisitCreate, db: AsyncSession = Depends(get_db)):
+async def create_visit(payload: VisitCreate, _user: CurrentUser, db: AsyncSession = Depends(get_db)):
     visit = Visit(**payload.model_dump())
     db.add(visit)
     await _sync_berth(payload.berth_id, BerthStatus.OCCUPIED, db)
@@ -76,7 +77,7 @@ async def get_visit(visit_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.patch("/{visit_id}", response_model=VisitResponse)
-async def update_visit(visit_id: int, payload: VisitUpdate, db: AsyncSession = Depends(get_db)):
+async def update_visit(visit_id: int, payload: VisitUpdate, _user: CurrentUser, db: AsyncSession = Depends(get_db)):
     visit = await db.get(Visit, visit_id)
     if not visit:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Visit not found")
@@ -114,7 +115,7 @@ async def update_visit(visit_id: int, payload: VisitUpdate, db: AsyncSession = D
 
 
 @router.delete("/{visit_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_visit(visit_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_visit(visit_id: int, _user: CurrentUser, db: AsyncSession = Depends(get_db)):
     visit = await db.get(Visit, visit_id)
     if not visit:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Visit not found")

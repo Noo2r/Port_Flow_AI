@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.dependencies import CurrentUser
 from app.database import get_db
 from app.models.voyage import Voyage
 from app.schemas.voyage import VoyageCreate, VoyageResponse, VoyageUpdate
@@ -24,7 +25,7 @@ async def list_voyages(
 
 
 @router.post("/", response_model=VoyageResponse, status_code=status.HTTP_201_CREATED)
-async def create_voyage(payload: VoyageCreate, db: AsyncSession = Depends(get_db)):
+async def create_voyage(payload: VoyageCreate, _user: CurrentUser, db: AsyncSession = Depends(get_db)):
     voyage = Voyage(**payload.model_dump())
     db.add(voyage)
     await db.commit()
@@ -41,7 +42,7 @@ async def get_voyage(voyage_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.patch("/{voyage_id}", response_model=VoyageResponse)
-async def update_voyage(voyage_id: int, payload: VoyageUpdate, db: AsyncSession = Depends(get_db)):
+async def update_voyage(voyage_id: int, payload: VoyageUpdate, _user: CurrentUser, db: AsyncSession = Depends(get_db)):
     voyage = await db.get(Voyage, voyage_id)
     if voyage is None:
         raise HTTPException(status_code=404, detail="Voyage not found")
@@ -53,7 +54,7 @@ async def update_voyage(voyage_id: int, payload: VoyageUpdate, db: AsyncSession 
 
 
 @router.delete("/{voyage_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_voyage(voyage_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_voyage(voyage_id: int, _user: CurrentUser, db: AsyncSession = Depends(get_db)):
     voyage = await db.get(Voyage, voyage_id)
     if voyage is None:
         raise HTTPException(status_code=404, detail="Voyage not found")

@@ -24,13 +24,13 @@ def test_get_visit_not_found(mock_db, unit_client):
     assert r.json()["error"] == "Visit not found"
 
 
-def test_create_visit_missing_required(unit_client):
-    r = unit_client.post("/api/v1/visits/", json={})
+def test_create_visit_missing_required(auth_unit_client):
+    r = auth_unit_client.post("/api/v1/visits/", json={})
     assert r.status_code == 422
 
 
-def test_create_visit_invalid_cargo_type(unit_client):
-    r = unit_client.post("/api/v1/visits/", json={
+def test_create_visit_invalid_cargo_type(auth_unit_client):
+    r = auth_unit_client.post("/api/v1/visits/", json={
         "vessel_id": 1,
         "berth_id": 1,
         "eta": _future_dt(),
@@ -41,21 +41,36 @@ def test_create_visit_invalid_cargo_type(unit_client):
     assert r.status_code == 422
 
 
-def test_patch_visit_not_found(mock_db, unit_client):
+def test_patch_visit_not_found(mock_db, auth_unit_client):
     from unittest.mock import AsyncMock
     mock_db.get = AsyncMock(return_value=None)
-    r = unit_client.patch("/api/v1/visits/999", json={"status": "in_port"})
+    r = auth_unit_client.patch("/api/v1/visits/999", json={"status": "in_port"})
     assert r.status_code == 404
+
+
+def test_create_visit_requires_auth(unit_client):
+    r = unit_client.post("/api/v1/visits/", json={"vessel_id": 1, "eta": _future_dt()})
+    assert r.status_code == 401
+
+
+def test_update_visit_requires_auth(unit_client):
+    r = unit_client.patch("/api/v1/visits/1", json={"status": "in_port"})
+    assert r.status_code == 401
+
+
+def test_delete_visit_requires_auth(unit_client):
+    r = unit_client.delete("/api/v1/visits/1")
+    assert r.status_code == 401
 
 
 # --- Integration tests ---
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_visit_crud_lifecycle(client):
+async def test_visit_crud_lifecycle(auth_client):
     u = uid()
     # Prerequisite: create vessel + berth
-    vessel_r = await client.post("/api/v1/vessels/", json={
+    vessel_r = await auth_client.post("/api/v1/vessels/", json={
         "imo_number": f"IMO9{u}",
         "name": "Visit Test Vessel",
         "vessel_type": "bulk_carrier",
@@ -63,7 +78,7 @@ async def test_visit_crud_lifecycle(client):
     assert vessel_r.status_code == 201
     vid = vessel_r.json()["id"]
 
-    berth_r = await client.post("/api/v1/berths/", json={
+    berth_r = await auth_client.post("/api/v1/berths/", json={
         "code": f"BV-{u}",
         "name": "Visit Test Berth",
         "berth_type": "bulk",
@@ -76,7 +91,7 @@ async def test_visit_crud_lifecycle(client):
     eta = _future_dt(days=3)
 
     # Create visit
-    r = await client.post("/api/v1/visits/", json={
+    r = await auth_client.post("/api/v1/visits/", json={
         "vessel_id": vid,
         "berth_id": bid,
         "eta": eta,
@@ -93,7 +108,7 @@ async def test_visit_crud_lifecycle(client):
 
     # Update to in_port with actual arrival
     ata = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    r = await client.patch(f"/api/v1/visits/{vsid}", json={
+    r = await auth_client.patch(f"/api/v1/visits/{vsid}", json={
         "status": "in_port",
         "ata": ata,
     })
@@ -102,23 +117,23 @@ async def test_visit_crud_lifecycle(client):
     assert r.json()["ata"] is not None
 
     # Filter by vessel_id
-    r = await client.get(f"/api/v1/visits/?vessel_id={vid}")
+    r = await auth_client.get(f"/api/v1/visits/?vessel_id={vid}")
     assert r.status_code == 200
     assert any(v["id"] == vsid for v in r.json())
 
     # 404 check
-    r = await client.get("/api/v1/visits/999999")
+    r = await auth_client.get("/api/v1/visits/999999")
     assert r.status_code == 404
 
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_berth_status_create_and_delete(client):
+async def test_berth_status_create_and_delete(auth_client):
     """Creating a visit with a berth_id marks that berth OCCUPIED;
     deleting the visit marks it back to AVAILABLE."""
     u = uid()
 
-    vessel_r = await client.post("/api/v1/vessels/", json={
+    vessel_r = await auth_client.post("/api/v1/vessels/", json={
         "imo_number": f"IMO8{u}",
         "name": "Berth Sync Vessel",
         "vessel_type": "container",
@@ -126,7 +141,7 @@ async def test_berth_status_create_and_delete(client):
     assert vessel_r.status_code == 201
     vid = vessel_r.json()["id"]
 
-    berth_r = await client.post("/api/v1/berths/", json={
+    berth_r = await auth_client.post("/api/v1/berths/", json={
         "code": f"BS-{u}",
         "name": "Berth Sync Test",
         "berth_type": "container",
@@ -138,7 +153,7 @@ async def test_berth_status_create_and_delete(client):
     assert berth_r.json()["status"] == "available"
 
     # Create visit → berth should become occupied
-    visit_r = await client.post("/api/v1/visits/", json={
+    visit_r = await auth_client.post("/api/v1/visits/", json={
         "vessel_id": vid,
         "berth_id": bid,
         "eta": _future_dt(days=1),
@@ -146,26 +161,26 @@ async def test_berth_status_create_and_delete(client):
     assert visit_r.status_code == 201
     vsid = visit_r.json()["id"]
 
-    berth_after_create = await client.get(f"/api/v1/berths/{bid}")
+    berth_after_create = await auth_client.get(f"/api/v1/berths/{bid}")
     assert berth_after_create.status_code == 200
     assert berth_after_create.json()["status"] == "occupied"
 
     # Delete visit → berth should become available again
-    del_r = await client.delete(f"/api/v1/visits/{vsid}")
+    del_r = await auth_client.delete(f"/api/v1/visits/{vsid}")
     assert del_r.status_code == 204
 
-    berth_after_delete = await client.get(f"/api/v1/berths/{bid}")
+    berth_after_delete = await auth_client.get(f"/api/v1/berths/{bid}")
     assert berth_after_delete.status_code == 200
     assert berth_after_delete.json()["status"] == "available"
 
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_berth_status_released_on_completed(client):
+async def test_berth_status_released_on_completed(auth_client):
     """Patching a visit's status to 'completed' releases its berth back to AVAILABLE."""
     u = uid()
 
-    vessel_r = await client.post("/api/v1/vessels/", json={
+    vessel_r = await auth_client.post("/api/v1/vessels/", json={
         "imo_number": f"IMO7{u}",
         "name": "Completion Vessel",
         "vessel_type": "tanker",
@@ -173,7 +188,7 @@ async def test_berth_status_released_on_completed(client):
     assert vessel_r.status_code == 201
     vid = vessel_r.json()["id"]
 
-    berth_r = await client.post("/api/v1/berths/", json={
+    berth_r = await auth_client.post("/api/v1/berths/", json={
         "code": f"BC-{u}",
         "name": "Completion Berth",
         "berth_type": "tanker",
@@ -183,18 +198,18 @@ async def test_berth_status_released_on_completed(client):
     assert berth_r.status_code == 201
     bid = berth_r.json()["id"]
 
-    visit_r = await client.post("/api/v1/visits/", json={
+    visit_r = await auth_client.post("/api/v1/visits/", json={
         "vessel_id": vid,
         "berth_id": bid,
         "eta": _future_dt(days=1),
     })
     assert visit_r.status_code == 201
     vsid = visit_r.json()["id"]
-    assert (await client.get(f"/api/v1/berths/{bid}")).json()["status"] == "occupied"
+    assert (await auth_client.get(f"/api/v1/berths/{bid}")).json()["status"] == "occupied"
 
     # Complete the visit → berth should become available
-    patch_r = await client.patch(f"/api/v1/visits/{vsid}", json={"status": "completed"})
+    patch_r = await auth_client.patch(f"/api/v1/visits/{vsid}", json={"status": "completed"})
     assert patch_r.status_code == 200
 
-    berth_final = await client.get(f"/api/v1/berths/{bid}")
+    berth_final = await auth_client.get(f"/api/v1/berths/{bid}")
     assert berth_final.json()["status"] == "available"

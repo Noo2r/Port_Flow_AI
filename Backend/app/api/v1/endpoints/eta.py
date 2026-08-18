@@ -194,7 +194,7 @@ async def _persist_allocation(
 
 
 @router.post("/predict/eta", response_model=PredictETAResult)
-async def predict_vessel_eta(payload: PredictETAInput, db: AsyncSession = Depends(get_db)):
+async def predict_vessel_eta(payload: PredictETAInput, _user: CurrentUser, db: AsyncSession = Depends(get_db)):
     """
     Predict vessel ETA delay using the CatBoost ML model.
     MAE ≈ 6.5 min · R² ≈ 0.82 · 38 features.
@@ -213,6 +213,7 @@ async def predict_vessel_eta(payload: PredictETAInput, db: AsyncSession = Depend
 @router.post("/predict/eta-and-berth", response_model=ETAAndBerthResult)
 async def predict_eta_and_allocate_berth(
     payload: PredictETAInput,
+    _user: CurrentUser,
     db: AsyncSession = Depends(get_db),
 ):
     """

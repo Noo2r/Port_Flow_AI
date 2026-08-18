@@ -19,35 +19,45 @@ def test_get_prediction_not_found(mock_db, unit_client):
     assert r.json()["error"] == "Prediction not found"
 
 
-def test_create_prediction_missing_required(unit_client):
-    r = unit_client.post("/api/v1/predictions/", json={})
+def test_create_prediction_missing_required(auth_unit_client):
+    r = auth_unit_client.post("/api/v1/predictions/", json={})
     assert r.status_code == 422
 
 
-def test_create_prediction_invalid_type(unit_client):
-    r = unit_client.post("/api/v1/predictions/", json={
+def test_create_prediction_invalid_type(auth_unit_client):
+    r = auth_unit_client.post("/api/v1/predictions/", json={
         "vessel_id": 1,
         "prediction_type": "telepathy",  # invalid
     })
     assert r.status_code == 422
 
 
-def test_patch_prediction_not_found(mock_db, unit_client):
+def test_patch_prediction_not_found(mock_db, auth_unit_client):
     from unittest.mock import AsyncMock
     mock_db.get = AsyncMock(return_value=None)
-    r = unit_client.patch("/api/v1/predictions/999", json={"status": "completed"})
+    r = auth_unit_client.patch("/api/v1/predictions/999", json={"status": "completed"})
     assert r.status_code == 404
+
+
+def test_create_prediction_requires_auth(unit_client):
+    r = unit_client.post("/api/v1/predictions/", json={"vessel_id": 1, "prediction_type": "eta"})
+    assert r.status_code == 401
+
+
+def test_update_prediction_requires_auth(unit_client):
+    r = unit_client.patch("/api/v1/predictions/1", json={"status": "completed"})
+    assert r.status_code == 401
 
 
 # --- Integration tests ---
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_prediction_crud_lifecycle(client):
+async def test_prediction_crud_lifecycle(auth_client):
     from datetime import datetime, timezone, timedelta
 
     # Create vessel
-    vr = await client.post("/api/v1/vessels/", json={
+    vr = await auth_client.post("/api/v1/vessels/", json={
         "imo_number": f"IMO9{uid()}",
         "name": "Prediction Test Vessel",
         "vessel_type": "tanker",
@@ -56,7 +66,7 @@ async def test_prediction_crud_lifecycle(client):
     vid = vr.json()["id"]
 
     # Create prediction
-    r = await client.post("/api/v1/predictions/", json={
+    r = await auth_client.post("/api/v1/predictions/", json={
         "vessel_id": vid,
         "prediction_type": "eta",
         "model_name": "xgboost",
@@ -72,7 +82,7 @@ async def test_prediction_crud_lifecycle(client):
 
     # Simulate model completing — update with result
     predicted_dt = (datetime.now(timezone.utc) + timedelta(hours=25)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    r = await client.patch(f"/api/v1/predictions/{pid}", json={
+    r = await auth_client.patch(f"/api/v1/predictions/{pid}", json={
         "status": "completed",
         "predicted_datetime": predicted_dt,
         "confidence_score": 0.87,
@@ -85,10 +95,10 @@ async def test_prediction_crud_lifecycle(client):
     assert updated["confidence_score"] == 0.87
 
     # Filter by vessel_id
-    r = await client.get(f"/api/v1/predictions/?vessel_id={vid}")
+    r = await auth_client.get(f"/api/v1/predictions/?vessel_id={vid}")
     assert r.status_code == 200
     assert any(p["id"] == pid for p in r.json())
 
     # 404 check
-    r = await client.get("/api/v1/predictions/999999")
+    r = await auth_client.get("/api/v1/predictions/999999")
     assert r.status_code == 404

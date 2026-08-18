@@ -10,38 +10,48 @@ def _future(hours=4) -> str:
 
 # ── Unit tests ───────────────────────────────────────────────────────────────
 
-def test_eta_missing_vessel_id(unit_client):
-    r = unit_client.post("/api/v1/ai/predict/eta", json={"distance_nm": 200})
+def test_eta_missing_vessel_id(auth_unit_client):
+    r = auth_unit_client.post("/api/v1/ai/predict/eta", json={"distance_nm": 200})
     assert r.status_code == 422
 
 
-def test_eta_invalid_distance(unit_client):
-    r = unit_client.post("/api/v1/ai/predict/eta", json={
+def test_eta_invalid_distance(auth_unit_client):
+    r = auth_unit_client.post("/api/v1/ai/predict/eta", json={
         "vessel_id": 1, "distance_nm": -50
     })
     assert r.status_code == 422
 
 
-def test_eta_invalid_weather_factor(unit_client):
-    r = unit_client.post("/api/v1/ai/predict/eta", json={
+def test_eta_invalid_weather_factor(auth_unit_client):
+    r = auth_unit_client.post("/api/v1/ai/predict/eta", json={
         "vessel_id": 1, "distance_nm": 200, "weather_factor": -1.0
     })
     assert r.status_code == 422
+
+
+def test_eta_predict_requires_auth(unit_client):
+    r = unit_client.post("/api/v1/ai/predict/eta", json={"vessel_id": 1})
+    assert r.status_code == 401
+
+
+def test_optimize_requires_auth(unit_client):
+    r = unit_client.post("/api/v1/opt/optimize")
+    assert r.status_code == 401
 
 
 # ── Integration tests ────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_eta_prediction_live(client):
+async def test_eta_prediction_live(auth_client):
     u = uid()
-    vr = await client.post("/api/v1/vessels/", json={
+    vr = await auth_client.post("/api/v1/vessels/", json={
         "imo_number": f"IMO9{u}", "name": "ETA Vessel",
         "vessel_type": "container", "flag": "EG",
     })
     vessel_id = vr.json()["id"]
 
-    r = await client.post("/api/v1/ai/predict/eta", json={
+    r = await auth_client.post("/api/v1/ai/predict/eta", json={
         "vessel_id": vessel_id, "distance_nm": 500, "weather_factor": 1.0,
     })
     assert r.status_code == 200
@@ -58,19 +68,19 @@ async def test_eta_prediction_live(client):
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_eta_weather_factor_delays_arrival(client):
+async def test_eta_weather_factor_delays_arrival(auth_client):
     """Higher weather_factor should push predicted arrival later."""
     u = uid()
-    vr = await client.post("/api/v1/vessels/", json={
+    vr = await auth_client.post("/api/v1/vessels/", json={
         "imo_number": f"IMO9{u}", "name": "WF Vessel",
         "vessel_type": "container", "flag": "EG",
     })
     vessel_id = vr.json()["id"]
 
-    r1 = await client.post("/api/v1/ai/predict/eta", json={
+    r1 = await auth_client.post("/api/v1/ai/predict/eta", json={
         "vessel_id": vessel_id, "distance_nm": 300, "weather_factor": 1.0,
     })
-    r2 = await client.post("/api/v1/ai/predict/eta", json={
+    r2 = await auth_client.post("/api/v1/ai/predict/eta", json={
         "vessel_id": vessel_id, "distance_nm": 300, "weather_factor": 2.0,
     })
     arr1 = datetime.fromisoformat(r1.json()["predicted_arrival"].replace("Z", "+00:00"))
@@ -80,8 +90,8 @@ async def test_eta_weather_factor_delays_arrival(client):
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_optimize_returns_valid_structure(client):
-    r = await client.post("/api/v1/opt/optimize")
+async def test_optimize_returns_valid_structure(auth_client):
+    r = await auth_client.post("/api/v1/opt/optimize")
     assert r.status_code == 200
     data = r.json()
     assert "assignments_made" in data
@@ -95,17 +105,17 @@ async def test_optimize_returns_valid_structure(client):
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_optimize_assigns_unassigned_visits(client):
+async def test_optimize_assigns_unassigned_visits(auth_client):
     """Create a vessel + visit with no berth, run optimizer, verify assignment."""
     u = uid()
-    vr = await client.post("/api/v1/vessels/", json={
+    vr = await auth_client.post("/api/v1/vessels/", json={
         "imo_number": f"IMO9{u}", "name": "Opt Vessel",
         "vessel_type": "bulk_carrier", "flag": "EG",
     })
     vessel_id = vr.json()["id"]
 
     # Create berth to ensure capacity
-    br = await client.post("/api/v1/berths/", json={
+    br = await auth_client.post("/api/v1/berths/", json={
         "code": f"OB-{u}", "name": "Opt Berth", "berth_type": "bulk",
         "max_length": 250.0, "max_draft": 14.0,
     })
@@ -115,13 +125,13 @@ async def test_optimize_assigns_unassigned_visits(client):
     eta_str = _future(200)
     etd_str = _future(220)
     # Must set etb/etd on visit for conflict check
-    visit_r = await client.post("/api/v1/visits/", json={
+    visit_r = await auth_client.post("/api/v1/visits/", json={
         "vessel_id": vessel_id, "status": "scheduled",
         "eta": eta_str, "etb": eta_str, "etd": etd_str,
     })
     visit_id = visit_r.json()["id"]
 
-    r = await client.post("/api/v1/opt/optimize")
+    r = await auth_client.post("/api/v1/opt/optimize")
     assert r.status_code == 200
     # Our new visit should now be assigned or at worst in unassigned (if all berths occupied)
     data = r.json()

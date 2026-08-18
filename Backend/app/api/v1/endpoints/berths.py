@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.dependencies import CurrentUser
 from app.database import get_db
 from app.models.berth import Berth
 from app.schemas.berth import BerthCreate, BerthUpdate, BerthResponse
@@ -20,7 +21,7 @@ async def list_berths(
 
 
 @router.post("/", response_model=BerthResponse, status_code=status.HTTP_201_CREATED)
-async def create_berth(payload: BerthCreate, db: AsyncSession = Depends(get_db)):
+async def create_berth(payload: BerthCreate, _user: CurrentUser, db: AsyncSession = Depends(get_db)):
     berth = Berth(**payload.model_dump())
     db.add(berth)
     await db.commit()
@@ -37,7 +38,7 @@ async def get_berth(berth_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.patch("/{berth_id}", response_model=BerthResponse)
-async def update_berth(berth_id: int, payload: BerthUpdate, db: AsyncSession = Depends(get_db)):
+async def update_berth(berth_id: int, payload: BerthUpdate, _user: CurrentUser, db: AsyncSession = Depends(get_db)):
     berth = await db.get(Berth, berth_id)
     if not berth:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Berth not found")
@@ -49,7 +50,7 @@ async def update_berth(berth_id: int, payload: BerthUpdate, db: AsyncSession = D
 
 
 @router.delete("/{berth_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_berth(berth_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_berth(berth_id: int, _user: CurrentUser, db: AsyncSession = Depends(get_db)):
     berth = await db.get(Berth, berth_id)
     if not berth:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Berth not found")

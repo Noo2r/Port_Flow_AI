@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.dependencies import CurrentUser
 from app.core.intelligence import AISService, ConflictDetector, WeatherCorrelationEngine
 from app.database import get_db
 from app.schemas.operations import (
@@ -17,6 +18,7 @@ router = APIRouter()
 async def update_ais_position(
     visit_id: int,
     payload: AISUpdateRequest,
+    _user: CurrentUser,
     db: AsyncSession = Depends(get_db),
 ):
     try:
