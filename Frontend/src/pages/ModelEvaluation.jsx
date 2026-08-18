@@ -134,7 +134,7 @@ export default function ModelEvaluation() {
   return (
     <MainLayout>
       <div className="flex flex-col h-full overflow-hidden">
-        <Navbar title="Model Evaluation" subtitle="ETA Predictor · CatBoost ML · 12,000 real arrivals" />
+        <Navbar title="Model Evaluation" subtitle="ETA Predictor · CatBoost ML · 12,000 held-out test arrivals" />
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
 
@@ -164,13 +164,13 @@ export default function ModelEvaluation() {
                       Evaluation Results
                     </h2>
                     <p className="text-xs mt-0.5" style={{ color: MUTED }}>
-                      {s.n.toLocaleString()} predictions evaluated on real port-arrival data (2023 – 2024)
+                      {s.n.toLocaleString()} predictions evaluated on a held-out synthetic test set never seen during training
                     </p>
                   </div>
                   <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium"
                     style={{ background: `${GREEN}15`, color: GREEN, border: `1px solid ${GREEN}30` }}>
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    Live data · generalization test
+                    Held-out data · generalization test
                   </div>
                 </div>
 

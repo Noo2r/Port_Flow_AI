@@ -178,9 +178,9 @@ class TestWaitingTimeCalculator:
 
     def test_queue_adds_delay(self):
         v = make_vessel(eta_offset_h=0.0)
-        b = make_berth(avail_offset_h=0.0, queue=4)   # 4 * 15 = 60 min
+        b = make_berth(avail_offset_h=0.0, queue=4)   # Container: 4 * 20 = 80 min
         wait, start, svc = WaitingTimeCalculator.compute_waiting_time(v, b)
-        assert abs(wait - 60.0) < 0.1
+        assert abs(wait - 80.0) < 0.1
 
     def test_service_hours_returned(self):
         v = make_vessel(service_h=8.0)
