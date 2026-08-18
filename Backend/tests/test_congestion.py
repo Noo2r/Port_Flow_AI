@@ -90,12 +90,38 @@ def test_evaluation_describes_three_stage_pipeline(auth_unit_client):
 
 
 def test_evaluation_grades_are_consistent_with_r2(auth_unit_client):
+    """Grade labels must match the shared _grade_r2 threshold scale.
+
+    At current real metrics (congestion R2≈0.937, queue R2≈0.51):
+      congestion → "Excellent"  (R2 >= 0.90)
+      queue      → "Fair"       (0.50 <= R2 < 0.75)
+    """
     r = auth_unit_client.get("/api/v1/congestion/evaluation")
     data = r.json()["models"]
-    if data["congestion"]["R2"] >= 0.90:
-        assert data["congestion"]["grade"] == "Excellent"
-    if data["queue"]["R2"] >= 0.50:
-        assert data["queue"]["grade"] == "Good"
+
+    # Congestion model: R2 >= 0.90 → "Excellent"
+    assert data["congestion"]["grade"] == "Excellent", (
+        f"Expected 'Excellent' for congestion R2={data['congestion']['R2']:.3f}"
+    )
+    # Queue model: 0.50 <= R2 < 0.75 → "Fair"
+    assert data["queue"]["grade"] == "Fair", (
+        f"Expected 'Fair' for queue R2={data['queue']['R2']:.3f}"
+    )
+
+
+def test_grade_r2_helper_thresholds():
+    """Unit-test _grade_r2 in isolation across all four bands."""
+    from app.api.v1.endpoints.congestion import _grade_r2
+
+    assert _grade_r2(0.95)  == "Excellent"
+    assert _grade_r2(0.90)  == "Excellent"   # boundary: inclusive
+    assert _grade_r2(0.89)  == "Good"
+    assert _grade_r2(0.75)  == "Good"        # boundary: inclusive
+    assert _grade_r2(0.74)  == "Fair"
+    assert _grade_r2(0.51)  == "Fair"        # current real queue R2
+    assert _grade_r2(0.50)  == "Fair"        # boundary: inclusive
+    assert _grade_r2(0.49)  == "Needs Improvement"
+    assert _grade_r2(0.00)  == "Needs Improvement"
 
 
 # ── /port-overview ────────────────────────────────────────────────────────────

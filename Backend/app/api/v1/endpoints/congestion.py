@@ -97,6 +97,24 @@ def _check_model():
         raise HTTPException(503, detail="Congestion model not loaded. Run training first.")
 
 
+def _grade_r2(r2: float) -> str:
+    """Shared, honest R² threshold scale applied identically to every model.
+
+    Thresholds:
+        >= 0.90  → "Excellent"
+        >= 0.75  → "Good"
+        >= 0.50  → "Fair"
+        <  0.50  → "Needs Improvement"
+    """
+    if r2 >= 0.90:
+        return "Excellent"
+    if r2 >= 0.75:
+        return "Good"
+    if r2 >= 0.50:
+        return "Fair"
+    return "Needs Improvement"
+
+
 # ── 1. Single prediction ───────────────────────────────────────────────────────
 
 @router.post("/predict", response_model=CongestionResult, tags=["Congestion Forecast"])
@@ -163,7 +181,7 @@ async def get_evaluation(
                 "R2":        m["congestion"]["R2"],
                 "R2_pct":    round(m["congestion"]["R2"] * 100, 1),
                 "MAE_pct":   round(m["congestion"]["MAE"] * 100, 1),
-                "grade":     "Excellent" if m["congestion"]["R2"] >= 0.90 else "Good",
+                "grade":     _grade_r2(m["congestion"]["R2"]),
                 "note":      f"Predicts port congestion to within ±{round(m['congestion']['MAE']*100,1)}% on held-out data",
             },
             "queue": {
@@ -173,8 +191,8 @@ async def get_evaluation(
                 "RMSE":      m["queue"]["RMSE"],
                 "R2":        m["queue"]["R2"],
                 "R2_pct":    round(m["queue"]["R2"] * 100, 1),
-                "grade":     "Good" if m["queue"]["R2"] >= 0.50 else "Moderate",
-                "note":      f"Predicts queue length to within ±{round(m['queue']['MAE'],1)} vessels",
+                "grade":     _grade_r2(m["queue"]["R2"]),
+                "note":      "Reliable for prioritization; exact queue-count precision is an active area of improvement.",
             },
         },
         "training_rows": info["training_rows"],
